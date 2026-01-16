@@ -1,47 +1,59 @@
 Name:           ki7mt-ai-lab-core
-Version:        1.0.4
+Version:        {{{ git_dir_version }}}
 Release:        1%{?dist}
 Summary:        Core database schemas for the KI7MT AI Lab
 
 License:        GPL-3.0-or-later
-URL:            https://github.com/KI7MT/ki7mt-ai-lab-core
-Source0: 	{{{ git_dir_pack }}}
+URL:            https://github.com/KI7MT/ki7mt-ai-lab
+VCS:            {{{ git_dir_vcs }}}
+Source0:        {{{ git_dir_pack }}}
 
 BuildArch:      noarch
-BuildRequires:  autoconf
-BuildRequires:  automake
-BuildRequires:  make
 
 Requires:       clickhouse-server >= 23.0
 Requires:       clickhouse-client >= 23.0
 
 %description
-Core database schemas for the KI7MT AI Lab WSPR/Solar project.
+Core database schemas and initialization scripts for the KI7MT AI Lab
+WSPR/Solar data analysis project. Includes ClickHouse DDL schemas
+optimized for 10+ billion rows of propagation data.
 
 %prep
-%autosetup
-./autogen.sh
+{{{ git_dir_setup_macro }}}
 
 %build
-%configure
-%make_build
+# Nothing to build - noarch package
 
 %install
-%make_install
+# Create directories
+install -d %{buildroot}%{_bindir}
+install -d %{buildroot}%{_datadir}/%{name}/ddl
+
+# Install and process scripts (substitute @PROGRAM@ and @VERSION@)
+for script in ki7mt-lab-db-init ki7mt-lab-env; do
+    sed -e 's|@PROGRAM@|%{name}|g' \
+        -e 's|@VERSION@|%{version}|g' \
+        src/${script} > %{buildroot}%{_bindir}/${script}
+    chmod 755 %{buildroot}%{_bindir}/${script}
+done
+
+# Install and process DDL files
+for sql in src/*.sql; do
+    basename=$(basename "$sql")
+    sed -e 's|@PROGRAM@|%{name}|g' \
+        -e 's|@VERSION@|%{version}|g' \
+        -e 's|@COPYRIGHT@|GPL-3.0-or-later|g' \
+        "$sql" > %{buildroot}%{_datadir}/%{name}/ddl/${basename}
+done
 
 %files
 %license COPYING
-%doc AUTHORS ChangeLog NEWS README
+%doc README
 %{_bindir}/ki7mt-lab-db-init
 %{_bindir}/ki7mt-lab-env
-%dir %{_datadir}/ki7mt
-%dir %{_datadir}/ki7mt/schema
-%{_datadir}/ki7mt/schema/01-wspr_schema.sql
-%{_datadir}/ki7mt/schema/02-solar_indices.sql
-%{_datadir}/ki7mt/schema/03-solar_silver.sql
-%{_datadir}/ki7mt/schema/04-data_mgmt.sql
-%{_datadir}/ki7mt/schema/05-geo_functions.sql
+%dir %{_datadir}/%{name}
+%dir %{_datadir}/%{name}/ddl
+%{_datadir}/%{name}/ddl/*.sql
 
 %changelog
-* Wed Jan 15 2025 Greg Beam <ki7mt@yahoo.com> - 1.0.1-1
-- Initial release
+{{{ git_dir_changelog }}}

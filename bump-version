@@ -1,35 +1,47 @@
 #!/bin/bash
 set -e
 
-# Purpose: Update version across all project files from VERSION file
-# Usage: ./bump-version [new-version]
-#   If new-version is provided, updates VERSION file first
-#   Then syncs version to configure.ac and spec file
+# Purpose: Bump version and create git tag for rpkg builds
+# Usage: ./bump-version <new-version>
+# Example: ./bump-version 1.0.5
+#
+# This script:
+#   1. Updates the VERSION file
+#   2. Commits the change
+#   3. Creates a git tag (vX.Y.Z format)
+#
+# rpkg uses git tags to determine package version automatically.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 VERSION_FILE="$SCRIPT_DIR/VERSION"
-SPEC_FILE="$SCRIPT_DIR/ki7mt-ai-lab-core.spec"
 
-if [[ ! -f "$VERSION_FILE" ]]; then
-    printf "Error: VERSION file not found\n" >&2
+if [[ -z "$1" ]]; then
+    printf "Usage: %s <new-version>\n" "$(basename "$0")"
+    printf "Example: %s 1.0.5\n" "$(basename "$0")"
+    printf "\nCurrent version: %s\n" "$(cat "$VERSION_FILE" 2>/dev/null || echo 'unknown')"
     exit 1
 fi
 
-# If a new version is provided, update the VERSION file
-if [[ -n "$1" ]]; then
-    printf "%s\n" "$1" > "$VERSION_FILE"
-    printf "Updated VERSION to %s\n" "$1"
+NEW_VERSION="$1"
+
+# Validate version format (X.Y.Z)
+if ! [[ "$NEW_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    printf "Error: Version must be in X.Y.Z format (e.g., 1.0.5)\n" >&2
+    exit 1
 fi
 
-VERSION=$(cat "$VERSION_FILE" | tr -d '[:space:]')
+# Update VERSION file
+printf "%s\n" "$NEW_VERSION" > "$VERSION_FILE"
+printf "Updated VERSION to %s\n" "$NEW_VERSION"
 
-# Update spec file Version: line
-if [[ -f "$SPEC_FILE" ]]; then
-    sed -i "s/^Version:.*$/Version:        $VERSION/" "$SPEC_FILE"
-    printf "Updated %s to version %s\n" "$(basename "$SPEC_FILE")" "$VERSION"
-fi
+# Stage and commit
+git add "$VERSION_FILE"
+git commit -m "v${NEW_VERSION}: version bump"
 
-# configure.ac reads from VERSION file via m4_esyscmd_s, so no update needed
-printf "configure.ac will read version %s from VERSION file\n" "$VERSION"
+# Create tag
+git tag -a "v${NEW_VERSION}" -m "Release v${NEW_VERSION}"
 
-printf "\nVersion sync complete: %s\n" "$VERSION"
+printf "\nVersion bump complete!\n"
+printf "  VERSION file: %s\n" "$NEW_VERSION"
+printf "  Git tag: v%s\n" "$NEW_VERSION"
+printf "\nTo push: git push && git push --tags\n"
