@@ -5,8 +5,7 @@ Summary:        Sovereign CUDA HAL for KI7MT AI Lab WSPR processing
 
 License:        GPL-3.0-or-later
 URL:            https://github.com/KI7MT/ki7mt-ai-lab-cuda
-VCS:            {{{ git_dir_vcs }}}
-Source0:        {{{ git_dir_pack }}}
+Source0:        https://github.com/KI7MT/%{name}/archive/v%{version}.tar.gz
 
 # Architecture-specific (fat binary: sm_80, sm_86, sm_89, sm_100)
 ExclusiveArch:  x86_64
@@ -48,7 +47,7 @@ Header files and CUDA source code for the KI7MT AI Lab CUDA HAL.
 Required for building applications with CGO that use the CUDA kernels.
 
 %prep
-{{{ git_dir_setup_macro }}}
+%autosetup -n %{name}-%{version}
 
 %build
 # Set CUDA paths for NVIDIA upstream toolkit
@@ -93,4 +92,10 @@ make install DESTDIR=%{buildroot} CUDA_PATH=$CUDA_PATH
 %{_datadir}/%{name}/src/*.h
 
 %changelog
-{{{ git_dir_changelog }}}
+* Thu Jan 16 2025 Greg Beam <ki7mt@outlook.com> - 1.1.3-1
+- COPR compatibility for headless GPU-less builds
+- Update nvidia-driver-cuda requirement to >= 590.48.01 for RTX 5090 Blackwell
+- Add EXTRA_NVCCFLAGS for -allow-unsupported-compiler flag
+- Embed proper SONAME in shared library ELF header
+- Replace manual post/postun with ldconfig_scriptlets (EL9 standard)
+- Switch to GitHub archive Source0 for COPR builds
