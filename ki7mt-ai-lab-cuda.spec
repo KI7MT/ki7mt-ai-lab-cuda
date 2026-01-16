@@ -1,5 +1,5 @@
 Name:           ki7mt-ai-lab-cuda
-Version:        1.1.3
+Version:        1.1.4
 Release:        1%{?dist}
 Summary:        Sovereign CUDA HAL for KI7MT AI Lab WSPR processing
 
