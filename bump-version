@@ -7,13 +7,13 @@ set -e
 #
 # This script:
 #   1. Updates the VERSION file
-#   2. Commits the change
-#   3. Creates a git tag (vX.Y.Z format)
-#
-# rpkg uses git tags to determine package version automatically.
+#   2. Updates the spec file Version: line
+#   3. Commits the changes
+#   4. Creates a git tag (vX.Y.Z format)
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 VERSION_FILE="$SCRIPT_DIR/VERSION"
+SPEC_FILE="$SCRIPT_DIR/ki7mt-ai-lab-core.spec"
 
 if [[ -z "$1" ]]; then
     printf "Usage: %s <new-version>\n" "$(basename "$0")"
@@ -34,8 +34,14 @@ fi
 printf "%s\n" "$NEW_VERSION" > "$VERSION_FILE"
 printf "Updated VERSION to %s\n" "$NEW_VERSION"
 
+# Update spec file Version: line
+if [[ -f "$SPEC_FILE" ]]; then
+    sed -i "s/^Version:.*$/Version:        ${NEW_VERSION}/" "$SPEC_FILE"
+    printf "Updated spec file to %s\n" "$NEW_VERSION"
+fi
+
 # Stage and commit
-git add "$VERSION_FILE"
+git add "$VERSION_FILE" "$SPEC_FILE"
 git commit -m "v${NEW_VERSION}: version bump"
 
 # Create tag
@@ -43,5 +49,6 @@ git tag -a "v${NEW_VERSION}" -m "Release v${NEW_VERSION}"
 
 printf "\nVersion bump complete!\n"
 printf "  VERSION file: %s\n" "$NEW_VERSION"
-printf "  Git tag: v%s\n" "$NEW_VERSION"
+printf "  Spec file:    %s\n" "$NEW_VERSION"
+printf "  Git tag:      v%s\n" "$NEW_VERSION"
 printf "\nTo push: git push && git push --tags\n"
