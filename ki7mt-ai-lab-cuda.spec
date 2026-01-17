@@ -2,7 +2,7 @@
 %global debug_package %{nil}
 
 Name:           ki7mt-ai-lab-cuda
-Version:        1.1.6
+Version:        1.1.7
 Release:        1%{?dist}
 Summary:        Sovereign CUDA HAL for KI7MT AI Lab WSPR processing
 
@@ -82,9 +82,10 @@ make install DESTDIR=%{buildroot} CUDA_PATH=$CUDA_PATH
 
 %files devel
 %doc src/cuda/README.md
-# Header file (in /usr/include/ki7mt/)
+# Header files (in /usr/include/ki7mt/)
 %dir %{_includedir}/ki7mt
 %{_includedir}/ki7mt/bridge.h
+%{_includedir}/ki7mt/wspr_structs.h
 # Static library
 %{_libdir}/lib%{name}.a
 # Development symlink
@@ -94,8 +95,20 @@ make install DESTDIR=%{buildroot} CUDA_PATH=$CUDA_PATH
 %dir %{_datadir}/%{name}/src
 %{_datadir}/%{name}/src/*.cu
 %{_datadir}/%{name}/src/*.h
+%{_datadir}/%{name}/src/*.c
+# Verification utilities
+%attr(755,root,root) %{_datadir}/%{name}/src/*.sh
 
 %changelog
+* Fri Jan 17 2026 Greg Beam <ki7mt@outlook.com> - 1.1.7-1
+- Add wspr_structs.h: RTX 5090-optimized 128-byte struct synchronized with ClickHouse
+- Add WSPRSpotCH: 99-byte ClickHouse RowBinary format struct
+- Add WSPR_STRIP_PADDING macro for GPU to ClickHouse conversion
+- Add verify_layout.c: Memory layout verification utility
+- Add verify_ingestion.sh: End-to-end ClickHouse ingestion test
+- Add wspr_structs_test.c: Compile-time static assertion tests
+- Install wspr_structs.h to include directory for CGO development
+
 * Sat Jan 17 2026 Greg Beam <ki7mt@outlook.com> - 1.1.6-1
 - Add spec changelog for v1.1.5 and v1.1.6
 

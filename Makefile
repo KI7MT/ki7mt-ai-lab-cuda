@@ -217,6 +217,10 @@ install: all
 	# Install source (for reference/rebuilding)
 	install -m 644 src/cuda/*.cu $(DESTDIR)$(DATADIR)/src/
 	install -m 644 src/cuda/*.h $(DESTDIR)$(DATADIR)/src/
+	install -m 644 src/cuda/*.c $(DESTDIR)$(DATADIR)/src/
+	install -m 755 src/cuda/*.sh $(DESTDIR)$(DATADIR)/src/
+	# Install wspr_structs.h to include directory (for development)
+	install -m 644 src/cuda/wspr_structs.h $(DESTDIR)$(INCDIR)/
 	@printf "\n"
 	@printf "Installed:\n"
 	@printf "  Header:   $(DESTDIR)$(INCDIR)/bridge.h\n"
