@@ -96,10 +96,10 @@ make install DESTDIR=%{buildroot} CUDA_PATH=$CUDA_PATH
 %{_datadir}/%{name}/src/*.h
 
 %changelog
-* Fri Jan 17 2026 Greg Beam <ki7mt@outlook.com> - 1.1.6-1
+* Sat Jan 17 2026 Greg Beam <ki7mt@outlook.com> - 1.1.6-1
 - Add spec changelog for v1.1.5 and v1.1.6
 
-* Fri Jan 17 2026 Greg Beam <ki7mt@outlook.com> - 1.1.5-1
+* Sat Jan 17 2026 Greg Beam <ki7mt@outlook.com> - 1.1.5-1
 - Add --help and --version flags to wspr-cuda-check
 - Update bump-version to track source file VERSION define
 
