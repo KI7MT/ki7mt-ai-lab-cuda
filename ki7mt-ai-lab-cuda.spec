@@ -2,7 +2,7 @@
 %global debug_package %{nil}
 
 Name:           ki7mt-ai-lab-cuda
-Version:        2.0.3
+Version:        2.0.4
 Release:        1%{?dist}
 Summary:        Sovereign CUDA HAL for KI7MT AI Lab WSPR processing
 
@@ -74,7 +74,7 @@ make install DESTDIR=%{buildroot} CUDA_PATH=$CUDA_PATH
 
 %files
 %license COPYING
-%doc README
+%doc README.md
 # Shared library with soname versioning
 %{_libdir}/lib%{name}.so.*
 # Check utility
@@ -101,6 +101,10 @@ make install DESTDIR=%{buildroot} CUDA_PATH=$CUDA_PATH
 %attr(755,root,root) %{_datadir}/%{name}/src/*.sh
 
 %changelog
+* Mon Jan 20 2025 Greg Beam <ki7mt@yahoo.com> - 2.0.4-1
+- Fix spec: README -> README.md
+- Fix changelog day-of-week errors
+
 * Mon Jan 20 2025 Greg Beam <ki7mt@yahoo.com> - 2.0.3-1
 - Fix maintainer email in changelog
 
@@ -122,17 +126,17 @@ make install DESTDIR=%{buildroot} CUDA_PATH=$CUDA_PATH
 - Add wspr_structs_test.c: Compile-time static assertion tests
 - Install wspr_structs.h to include directory for CGO development
 
-* Sat Jan 17 2025 Greg Beam <ki7mt@yahoo.com> - 1.1.6-1
+* Fri Jan 17 2025 Greg Beam <ki7mt@yahoo.com> - 1.1.6-1
 - Add spec changelog for v1.1.5 and v1.1.6
 
-* Sat Jan 17 2025 Greg Beam <ki7mt@yahoo.com> - 1.1.5-1
+* Fri Jan 17 2025 Greg Beam <ki7mt@yahoo.com> - 1.1.5-1
 - Add --help and --version flags to wspr-cuda-check
 - Update bump-version to track source file VERSION define
 
-* Fri Jan 16 2025 Greg Beam <ki7mt@yahoo.com> - 1.1.4-1
+* Thu Jan 16 2025 Greg Beam <ki7mt@yahoo.com> - 1.1.4-1
 - Hardcode Source0 URL to avoid rpkg naming conflicts
 
-* Fri Jan 16 2025 Greg Beam <ki7mt@yahoo.com> - 1.1.3-1
+* Thu Jan 16 2025 Greg Beam <ki7mt@yahoo.com> - 1.1.3-1
 - COPR compatibility for headless GPU-less builds
 - Update nvidia-driver-cuda requirement to >= 590.48.01 for RTX 5090 Blackwell
 - Add EXTRA_NVCCFLAGS for -allow-unsupported-compiler flag
