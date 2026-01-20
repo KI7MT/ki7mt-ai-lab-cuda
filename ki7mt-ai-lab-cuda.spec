@@ -2,7 +2,7 @@
 %global debug_package %{nil}
 
 Name:           ki7mt-ai-lab-cuda
-Version:        2.0.1
+Version:        2.0.2
 Release:        1%{?dist}
 Summary:        Sovereign CUDA HAL for KI7MT AI Lab WSPR processing
 
@@ -85,6 +85,7 @@ make install DESTDIR=%{buildroot} CUDA_PATH=$CUDA_PATH
 # Header files (in /usr/include/ki7mt/)
 %dir %{_includedir}/ki7mt
 %{_includedir}/ki7mt/bridge.h
+%{_includedir}/ki7mt/bulk_kernels.h
 %{_includedir}/ki7mt/wspr_structs.h
 # Static library
 %{_libdir}/lib%{name}.a
@@ -100,12 +101,16 @@ make install DESTDIR=%{buildroot} CUDA_PATH=$CUDA_PATH
 %attr(755,root,root) %{_datadir}/%{name}/src/*.sh
 
 %changelog
-* Mon Jan 20 2026 Greg Beam <ki7mt@outlook.com> - 2.0.1-1
+* Mon Jan 20 2025 Greg Beam <ki7mt@outlook.com> - 2.0.2-1
+- Fix RPATH issue: remove build-time path from wspr-cuda-check binary
+- Fix spec: add missing bulk_kernels.h to devel package
+
+* Mon Jan 20 2025 Greg Beam <ki7mt@outlook.com> - 2.0.1-1
 - Add sm_120 (Blackwell refresh) to fat binary targets
 - Add bulk_kernels.cu: SoA-based bulk processing kernels for CGO
 - Sync version with ki7mt-ai-lab-core v2.0.1
 
-* Fri Jan 17 2026 Greg Beam <ki7mt@outlook.com> - 1.1.7-1
+* Fri Jan 17 2025 Greg Beam <ki7mt@outlook.com> - 1.1.7-1
 - Add wspr_structs.h: RTX 5090-optimized 128-byte struct synchronized with ClickHouse
 - Add WSPRSpotCH: 99-byte ClickHouse RowBinary format struct
 - Add WSPR_STRIP_PADDING macro for GPU to ClickHouse conversion
@@ -114,17 +119,17 @@ make install DESTDIR=%{buildroot} CUDA_PATH=$CUDA_PATH
 - Add wspr_structs_test.c: Compile-time static assertion tests
 - Install wspr_structs.h to include directory for CGO development
 
-* Sat Jan 17 2026 Greg Beam <ki7mt@outlook.com> - 1.1.6-1
+* Sat Jan 17 2025 Greg Beam <ki7mt@outlook.com> - 1.1.6-1
 - Add spec changelog for v1.1.5 and v1.1.6
 
-* Sat Jan 17 2026 Greg Beam <ki7mt@outlook.com> - 1.1.5-1
+* Sat Jan 17 2025 Greg Beam <ki7mt@outlook.com> - 1.1.5-1
 - Add --help and --version flags to wspr-cuda-check
 - Update bump-version to track source file VERSION define
 
-* Fri Jan 16 2026 Greg Beam <ki7mt@outlook.com> - 1.1.4-1
+* Fri Jan 16 2025 Greg Beam <ki7mt@outlook.com> - 1.1.4-1
 - Hardcode Source0 URL to avoid rpkg naming conflicts
 
-* Fri Jan 16 2026 Greg Beam <ki7mt@outlook.com> - 1.1.3-1
+* Fri Jan 16 2025 Greg Beam <ki7mt@outlook.com> - 1.1.3-1
 - COPR compatibility for headless GPU-less builds
 - Update nvidia-driver-cuda requirement to >= 590.48.01 for RTX 5090 Blackwell
 - Add EXTRA_NVCCFLAGS for -allow-unsupported-compiler flag

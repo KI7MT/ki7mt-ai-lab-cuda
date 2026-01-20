@@ -196,9 +196,10 @@ $(SHARED_LIB): $(CUDA_OBJS) | $(LIBDIR_BUILD)
 	@printf "  Devlink: $(SHARED_LINK)\n"
 
 # Build check utility
+# NOTE: No RPATH - relies on ldconfig for installed library path
 $(CHECK_BIN): $(CHECK_SRC) $(SHARED_LIB) | $(BINDIR_BUILD)
 	@printf "Building wspr-cuda-check utility...\n"
-	gcc $(CFLAGS) -I src/cuda -o $@ $(CHECK_SRC) -L$(LIBDIR_BUILD) -l$(NAME) $(LDFLAGS) -Wl,-rpath,$(LIBDIR_BUILD)
+	gcc $(CFLAGS) -I src/cuda -o $@ $(CHECK_SRC) -L$(LIBDIR_BUILD) -l$(NAME) $(LDFLAGS)
 	@printf "  Output: $@\n"
 
 # =============================================================================
