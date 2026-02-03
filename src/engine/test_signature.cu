@@ -88,7 +88,7 @@ void print_header() {
     printf("\n");
     printf("┌─────────────────────────────────────────────────────────────┐\n");
     printf("│  Signature Engine Test - Blackwell sm_120                   │\n");
-    printf("│  ki7mt-ai-lab-cuda v2.0.5                                   │\n");
+    printf("│  ki7mt-ai-lab-cuda v2.0.6                                   │\n");
     printf("└─────────────────────────────────────────────────────────────┘\n");
     printf("\n");
 }

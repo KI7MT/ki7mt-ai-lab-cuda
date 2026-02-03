@@ -2,7 +2,7 @@
 %global debug_package %{nil}
 
 Name:           ki7mt-ai-lab-cuda
-Version:        2.0.5
+Version:        2.0.6
 Release:        1%{?dist}
 Summary:        Sovereign CUDA HAL for KI7MT AI Lab WSPR processing
 
@@ -101,6 +101,13 @@ make install DESTDIR=%{buildroot} CUDA_PATH=$CUDA_PATH
 %attr(755,root,root) %{_datadir}/%{name}/src/*.sh
 
 %changelog
+* Sun Feb 02 2026 Greg Beam <ki7mt@yahoo.com> - 2.0.6-1
+- Add CUDA Signature Engine for Blackwell sm_120
+- Add CMakeLists.txt with CMake 3.28+ CUDA language support
+- Add signature_kernel.cu with path quality computation (Haversine, Kp, X-ray)
+- Add test_signature.cu with 8 test scenarios
+- Verified on RTX PRO 6000 Blackwell (95GB, 188 SMs)
+
 * Mon Jan 20 2025 Greg Beam <ki7mt@yahoo.com> - 2.0.4-1
 - Fix spec: README -> README.md
 - Fix changelog day-of-week errors
