@@ -180,6 +180,22 @@ if(HAVE_CLICKHOUSE)
         ${CLICKHOUSE_TARGET}
         CUDA::cudart
     )
+
+    # Executable: Bulk Processor (overnight batch processing)
+    add_executable(bulk-processor
+        src/engine/bulk_processor.cu
+    )
+
+    target_include_directories(bulk-processor PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/io
+    )
+
+    target_link_libraries(bulk-processor
+        wspr_signature_engine
+        wspr_clickhouse_loader
+        ${CLICKHOUSE_TARGET}
+        CUDA::cudart
+    )
 endif()
 
 # =============================================================================
