@@ -56,9 +56,19 @@ find_package(clickhouse-cpp CONFIG QUIET)
 if(clickhouse-cpp_FOUND)
     message(STATUS "Found clickhouse-cpp: ${clickhouse-cpp_VERSION}")
     set(HAVE_CLICKHOUSE TRUE)
+    set(CLICKHOUSE_TARGET clickhouse-cpp::clickhouse-cpp)
 else()
-    message(STATUS "clickhouse-cpp not found - ClickHouse integration disabled")
-    set(HAVE_CLICKHOUSE FALSE)
+    message(STATUS "clickhouse-cpp not found - attempting FetchContent...")
+    include(FetchContent)
+    FetchContent_Declare(
+        clickhouse-cpp
+        GIT_REPOSITORY https://github.com/ClickHouse/clickhouse-cpp.git
+        GIT_TAG        v2.5.1
+    )
+    FetchContent_MakeAvailable(clickhouse-cpp)
+    set(HAVE_CLICKHOUSE TRUE)
+    set(CLICKHOUSE_TARGET clickhouse-cpp-lib)
+    message(STATUS "clickhouse-cpp fetched via FetchContent")
 endif()
 
 # =============================================================================
@@ -135,16 +145,39 @@ target_link_libraries(signature-engine-test
 )
 
 # =============================================================================
-# Optional: ClickHouse Data Loader
+# Optional: ClickHouse Data Loader Library and Demo
 # =============================================================================
 if(HAVE_CLICKHOUSE)
-    add_executable(signature-loader
-        src/engine/clickhouse_loader.cpp
+    # Library: ClickHouse Loader
+    add_library(wspr_clickhouse_loader STATIC
+        src/io/clickhouse_loader.cpp
     )
 
-    target_link_libraries(signature-loader
+    target_include_directories(wspr_clickhouse_loader PUBLIC
+        ${CMAKE_SOURCE_DIR}/src/io
+    )
+
+    target_link_libraries(wspr_clickhouse_loader
+        ${CLICKHOUSE_TARGET}
+    )
+
+    set_target_properties(wspr_clickhouse_loader PROPERTIES
+        POSITION_INDEPENDENT_CODE ON
+    )
+
+    # Executable: Signature Training Demo (fetches data and runs kernel)
+    add_executable(signature-training-demo
+        src/engine/training_demo.cu
+    )
+
+    target_include_directories(signature-training-demo PRIVATE
+        ${CMAKE_SOURCE_DIR}/src/io
+    )
+
+    target_link_libraries(signature-training-demo
         wspr_signature_engine
-        clickhouse-cpp::clickhouse-cpp
+        wspr_clickhouse_loader
+        ${CLICKHOUSE_TARGET}
         CUDA::cudart
     )
 endif()
