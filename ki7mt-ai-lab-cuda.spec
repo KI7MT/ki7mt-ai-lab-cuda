@@ -2,7 +2,7 @@
 %global debug_package %{nil}
 
 Name:           ki7mt-ai-lab-cuda
-Version:        2.0.8
+Version:        2.1.0
 Release:        1%{?dist}
 Summary:        Sovereign CUDA HAL for KI7MT AI Lab WSPR processing
 
@@ -101,6 +101,9 @@ make install DESTDIR=%{buildroot} CUDA_PATH=$CUDA_PATH
 %attr(755,root,root) %{_datadir}/%{name}/src/*.sh
 
 %changelog
+* Mon Feb 03 2026 Greg Beam <ki7mt@yahoo.com> - 2.1.0-1
+- Align version across all lab packages at 2.1.0
+
 * Mon Feb 03 2026 Greg Beam <ki7mt@yahoo.com> - 2.0.8-1
 - Fix Physics Gap: 3-hour bucket JOIN for solar data matching
 - ClickHouse loader CTE aggregates Kp/X-ray/SFI into 3-hour windows
