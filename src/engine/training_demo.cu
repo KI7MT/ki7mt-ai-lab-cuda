@@ -1,8 +1,8 @@
 /**
  * training_demo.cu - Signature Engine Training Demo
  *
- * Fetches WSPR spots from ClickHouse, processes on Blackwell GPU,
- * and computes path quality signatures.
+ * Fetches WSPR spots from ClickHouse, computes embeddings on Blackwell GPU,
+ * and writes results back to wspr.model_features table.
  *
  * Part of: ki7mt-ai-lab-cuda (Sovereign CUDA Engine)
  *
@@ -49,6 +49,7 @@ void print_header() {
     printf("┌─────────────────────────────────────────────────────────────┐\n");
     printf("│  Signature Engine Training Demo - Blackwell sm_120          │\n");
     printf("│  ki7mt-ai-lab-cuda v2.0.6                                   │\n");
+    printf("│  Phase 7: Vector Vault (Embedding Write-Back)               │\n");
     printf("└─────────────────────────────────────────────────────────────┘\n");
     printf("\n");
 }
@@ -61,6 +62,7 @@ void print_usage(const char* prog) {
     printf("  -s, --start DATE      Start date (YYYY-MM-DD)\n");
     printf("  -e, --end DATE        End date (YYYY-MM-DD)\n");
     printf("  -b, --band N          Band filter (ADIF band ID, 0 = all)\n");
+    printf("  -w, --write           Write embeddings to wspr.model_features\n");
     printf("  -h, --help            Show this help\n");
     printf("\n");
 }
@@ -77,6 +79,7 @@ int main(int argc, char* argv[]) {
     std::string start_date = "";
     std::string end_date = "";
     int band = 0;
+    bool write_back = false;
 
     for (int i = 1; i < argc; i++) {
         std::string arg = argv[i];
@@ -88,6 +91,8 @@ int main(int argc, char* argv[]) {
             end_date = argv[++i];
         } else if ((arg == "-b" || arg == "--band") && i + 1 < argc) {
             band = std::stoi(argv[++i]);
+        } else if (arg == "-w" || arg == "--write") {
+            write_back = true;
         } else if (arg == "-h" || arg == "--help") {
             print_usage(argv[0]);
             return 0;
@@ -97,7 +102,7 @@ int main(int argc, char* argv[]) {
     // -------------------------------------------------------------------------
     // 1. GPU Detection
     // -------------------------------------------------------------------------
-    printf("[1/5] Detecting GPU...\n");
+    printf("[1/6] Detecting GPU...\n");
 
     int device_count = 0;
     CUDA_CHECK(cudaGetDeviceCount(&device_count));
@@ -118,7 +123,7 @@ int main(int argc, char* argv[]) {
     // -------------------------------------------------------------------------
     // 2. Connect to ClickHouse
     // -------------------------------------------------------------------------
-    printf("[2/5] Connecting to ClickHouse...\n");
+    printf("[2/6] Connecting to ClickHouse...\n");
 
     wspr::io::ConnectionConfig config;
     config.host = "localhost";
@@ -138,7 +143,7 @@ int main(int argc, char* argv[]) {
     // -------------------------------------------------------------------------
     // 3. Fetch Training Batch
     // -------------------------------------------------------------------------
-    printf("[3/5] Fetching training batch...\n");
+    printf("[3/6] Fetching training batch...\n");
     printf("      Batch size: %zu\n", batch_size);
     if (!start_date.empty()) printf("      Start date: %s\n", start_date.c_str());
     if (!end_date.empty()) printf("      End date: %s\n", end_date.c_str());
@@ -163,13 +168,15 @@ int main(int argc, char* argv[]) {
     // -------------------------------------------------------------------------
     // 4. Copy to GPU
     // -------------------------------------------------------------------------
-    printf("[4/5] Copying data to GPU...\n");
+    printf("[4/6] Copying data to GPU...\n");
 
     size_t n = batch.size();
     size_t data_size = n * sizeof(float);
+    size_t embedding_size = n * sizeof(float4);
 
     float *d_tx_lat, *d_tx_lon, *d_rx_lat, *d_rx_lon;
-    float *d_kp, *d_xray, *d_quality, *d_distance;
+    float *d_kp, *d_xray, *d_distance;
+    float4 *d_embedding;
 
     CUDA_CHECK(cudaMalloc(&d_tx_lat, data_size));
     CUDA_CHECK(cudaMalloc(&d_tx_lon, data_size));
@@ -177,8 +184,8 @@ int main(int argc, char* argv[]) {
     CUDA_CHECK(cudaMalloc(&d_rx_lon, data_size));
     CUDA_CHECK(cudaMalloc(&d_kp, data_size));
     CUDA_CHECK(cudaMalloc(&d_xray, data_size));
-    CUDA_CHECK(cudaMalloc(&d_quality, data_size));
     CUDA_CHECK(cudaMalloc(&d_distance, data_size));
+    CUDA_CHECK(cudaMalloc(&d_embedding, embedding_size));
 
     CUDA_CHECK(cudaMemcpy(d_tx_lat, batch.tx_lat.data(), data_size, cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(d_tx_lon, batch.tx_lon.data(), data_size, cudaMemcpyHostToDevice));
@@ -187,24 +194,25 @@ int main(int argc, char* argv[]) {
     CUDA_CHECK(cudaMemcpy(d_kp, batch.kp_index.data(), data_size, cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(d_xray, batch.xray_flux.data(), data_size, cudaMemcpyHostToDevice));
 
-    printf("      Allocated %.2f MB device memory\n", (8 * data_size) / (1024.0 * 1024.0));
+    printf("      Allocated %.2f MB device memory\n",
+           (6 * data_size + data_size + embedding_size) / (1024.0 * 1024.0));
     printf("      " GREEN "OK" RESET "\n\n");
 
     // -------------------------------------------------------------------------
-    // 5. Execute Kernel
+    // 5. Execute Embedding Kernel
     // -------------------------------------------------------------------------
-    printf("[5/5] Executing signature kernel...\n");
+    printf("[5/6] Computing signature embeddings...\n");
 
     int num_blocks = (n + BLOCK_SIZE - 1) / BLOCK_SIZE;
 
     auto kernel_start = std::chrono::high_resolution_clock::now();
 
-    compute_path_quality<<<num_blocks, BLOCK_SIZE>>>(
+    compute_signature_embedding<<<num_blocks, BLOCK_SIZE>>>(
         n,
         d_tx_lat, d_tx_lon,
         d_rx_lat, d_rx_lon,
         d_kp, d_xray,
-        d_quality, d_distance
+        d_embedding, d_distance
     );
 
     CUDA_CHECK(cudaDeviceSynchronize());
@@ -213,52 +221,96 @@ int main(int argc, char* argv[]) {
     double kernel_time = std::chrono::duration<double, std::milli>(kernel_end - kernel_start).count();
 
     printf("      Kernel time: %.3f ms\n", kernel_time);
-    printf("      Throughput: %.2f M paths/sec\n", n / kernel_time / 1000.0);
+    printf("      Throughput: %.2f M embeddings/sec\n", n / kernel_time / 1000.0);
     printf("      " GREEN "OK" RESET "\n\n");
 
     // -------------------------------------------------------------------------
-    // Retrieve and Analyze Results
+    // Retrieve Results
     // -------------------------------------------------------------------------
-    std::vector<float> h_quality(n);
+    std::vector<float4> h_embedding(n);
     std::vector<float> h_distance(n);
 
-    CUDA_CHECK(cudaMemcpy(h_quality.data(), d_quality, data_size, cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(h_embedding.data(), d_embedding, embedding_size, cudaMemcpyDeviceToHost));
     CUDA_CHECK(cudaMemcpy(h_distance.data(), d_distance, data_size, cudaMemcpyDeviceToHost));
 
-    // Compute statistics
+    // Convert to EmbeddingResult struct
+    wspr::io::EmbeddingResult embeddings;
+    embeddings.resize(n);
+    for (size_t i = 0; i < n; i++) {
+        embeddings.norm_distance[i] = h_embedding[i].x;
+        embeddings.solar_penalty[i] = h_embedding[i].y;
+        embeddings.geo_penalty[i] = h_embedding[i].z;
+        embeddings.quality[i] = h_embedding[i].w;
+        embeddings.distance_km[i] = h_distance[i];
+    }
+
+    // -------------------------------------------------------------------------
+    // 6. Write Back to ClickHouse (optional)
+    // -------------------------------------------------------------------------
+    if (write_back) {
+        printf("[6/6] Writing embeddings to wspr.model_features...\n");
+
+        auto write_start = std::chrono::high_resolution_clock::now();
+
+        size_t inserted = loader.insert_batch(batch, embeddings);
+
+        auto write_end = std::chrono::high_resolution_clock::now();
+        double write_time = std::chrono::duration<double>(write_end - write_start).count();
+
+        if (inserted == 0) {
+            fprintf(stderr, RED "ERROR: %s\n" RESET, loader.last_error().c_str());
+            printf("      " YELLOW "SKIPPED" RESET " (table may not exist - run sql/01-model_features.sql)\n\n");
+        } else {
+            printf("      Inserted: %zu rows\n", inserted);
+            printf("      Time: %.3f seconds (%.2f Krps)\n", write_time, inserted / write_time / 1000.0);
+            printf("      " GREEN "OK" RESET "\n\n");
+        }
+    } else {
+        printf("[6/6] " YELLOW "SKIPPED" RESET " (use -w to write embeddings)\n\n");
+    }
+
+    // -------------------------------------------------------------------------
+    // Compute Statistics
+    // -------------------------------------------------------------------------
     float sum_quality = 0, sum_distance = 0;
     float min_quality = 1.0f, max_quality = 0.0f;
-    float min_distance = 1e9f, max_distance = 0.0f;
+    float sum_solar = 0, sum_geo = 0;
 
     for (size_t i = 0; i < n; i++) {
-        sum_quality += h_quality[i];
-        sum_distance += h_distance[i];
-        if (h_quality[i] < min_quality) min_quality = h_quality[i];
-        if (h_quality[i] > max_quality) max_quality = h_quality[i];
-        if (h_distance[i] < min_distance) min_distance = h_distance[i];
-        if (h_distance[i] > max_distance) max_distance = h_distance[i];
+        sum_quality += embeddings.quality[i];
+        sum_distance += embeddings.distance_km[i];
+        sum_solar += embeddings.solar_penalty[i];
+        sum_geo += embeddings.geo_penalty[i];
+        if (embeddings.quality[i] < min_quality) min_quality = embeddings.quality[i];
+        if (embeddings.quality[i] > max_quality) max_quality = embeddings.quality[i];
     }
 
     float avg_quality = sum_quality / n;
     float avg_distance = sum_distance / n;
+    float avg_solar = sum_solar / n;
+    float avg_geo = sum_geo / n;
 
     // Print statistics
     printf("┌─────────────────────────────────────────────────────────────┐\n");
-    printf("│  Results Summary                                            │\n");
+    printf("│  Embedding Statistics                                       │\n");
     printf("├─────────────────────────────────────────────────────────────┤\n");
-    printf("│  Paths processed:  %-40zu │\n", n);
+    printf("│  Paths processed:     %-37zu │\n", n);
+    printf("│  Avg distance:        %-37.0f km │\n", avg_distance);
     printf("├─────────────────────────────────────────────────────────────┤\n");
-    printf("│  Distance (km):    min=%-8.0f  avg=%-8.0f  max=%-8.0f  │\n",
-           min_distance, avg_distance, max_distance);
-    printf("│  Quality (0-1):    min=%-8.4f  avg=%-8.4f  max=%-8.4f  │\n",
-           min_quality, avg_quality, max_quality);
+    printf("│  Embedding Vector Components (avg):                         │\n");
+    printf("│    [0] Norm Distance: %-38.4f │\n", avg_distance / 20000.0f);
+    printf("│    [1] Solar Penalty: %-38.4f │\n", avg_solar);
+    printf("│    [2] Geo Penalty:   %-38.4f │\n", avg_geo);
+    printf("│    [3] Quality:       %-38.4f │\n", avg_quality);
+    printf("├─────────────────────────────────────────────────────────────┤\n");
+    printf("│  Quality range:       min=%.4f  max=%.4f                  │\n", min_quality, max_quality);
     printf("└─────────────────────────────────────────────────────────────┘\n");
     printf("\n");
 
     // Quality distribution
     int q_buckets[10] = {0};
     for (size_t i = 0; i < n; i++) {
-        int bucket = (int)(h_quality[i] * 10);
+        int bucket = (int)(embeddings.quality[i] * 10);
         if (bucket >= 10) bucket = 9;
         q_buckets[bucket]++;
     }
@@ -273,13 +325,17 @@ int main(int argc, char* argv[]) {
     }
     printf("\n");
 
-    // Sample output
-    printf("Sample paths (first 5):\n");
-    printf("  %-12s %-12s %-10s %-10s %-8s\n", "TX Lat", "TX Lon", "Distance", "Kp", "Quality");
+    // Sample embeddings
+    printf("Sample embeddings (first 5):\n");
+    printf("  %-10s %-10s %-10s %-10s %-10s\n",
+           "NormDist", "Solar", "Geo", "Quality", "DistKm");
     for (size_t i = 0; i < 5 && i < n; i++) {
-        printf("  %-12.4f %-12.4f %-10.0f %-10.2f %-8.4f\n",
-               batch.tx_lat[i], batch.tx_lon[i],
-               h_distance[i], batch.kp_index[i], h_quality[i]);
+        printf("  %-10.4f %-10.4f %-10.4f %-10.4f %-10.0f\n",
+               embeddings.norm_distance[i],
+               embeddings.solar_penalty[i],
+               embeddings.geo_penalty[i],
+               embeddings.quality[i],
+               embeddings.distance_km[i]);
     }
     printf("\n");
 
@@ -292,10 +348,13 @@ int main(int argc, char* argv[]) {
     cudaFree(d_rx_lon);
     cudaFree(d_kp);
     cudaFree(d_xray);
-    cudaFree(d_quality);
     cudaFree(d_distance);
+    cudaFree(d_embedding);
 
     printf(GREEN "Training demo complete.\n" RESET);
+    if (!write_back) {
+        printf(YELLOW "Hint: Use -w flag to write embeddings to ClickHouse\n" RESET);
+    }
     printf("\n");
 
     return 0;

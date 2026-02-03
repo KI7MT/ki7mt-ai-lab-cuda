@@ -42,6 +42,14 @@ struct TrainingBatch {
     // Timestamps for temporal features
     std::vector<uint32_t> timestamps;
 
+    // Original grid strings (for write-back)
+    std::vector<std::string> tx_grids;
+    std::vector<std::string> rx_grids;
+
+    // Frequency and band (for write-back)
+    std::vector<uint64_t> frequencies;
+    std::vector<int32_t> bands;
+
     // Metadata
     size_t size() const { return tx_lat.size(); }
     bool empty() const { return tx_lat.empty(); }
@@ -55,6 +63,10 @@ struct TrainingBatch {
         xray_flux.reserve(n);
         sfi.reserve(n);
         timestamps.reserve(n);
+        tx_grids.reserve(n);
+        rx_grids.reserve(n);
+        frequencies.reserve(n);
+        bands.reserve(n);
     }
 
     void clear() {
@@ -66,6 +78,41 @@ struct TrainingBatch {
         xray_flux.clear();
         sfi.clear();
         timestamps.clear();
+        tx_grids.clear();
+        rx_grids.clear();
+        frequencies.clear();
+        bands.clear();
+    }
+};
+
+/**
+ * Embedding result from GPU computation
+ *
+ * Matches float4 output from compute_signature_embedding kernel.
+ */
+struct EmbeddingResult {
+    std::vector<float> norm_distance;   // Normalized distance (0-1)
+    std::vector<float> solar_penalty;   // X-ray impact factor
+    std::vector<float> geo_penalty;     // Kp impact factor
+    std::vector<float> quality;         // Combined quality
+    std::vector<float> distance_km;     // Raw distance in km
+
+    size_t size() const { return quality.size(); }
+
+    void reserve(size_t n) {
+        norm_distance.reserve(n);
+        solar_penalty.reserve(n);
+        geo_penalty.reserve(n);
+        quality.reserve(n);
+        distance_km.reserve(n);
+    }
+
+    void resize(size_t n) {
+        norm_distance.resize(n);
+        solar_penalty.resize(n);
+        geo_penalty.resize(n);
+        quality.resize(n);
+        distance_km.resize(n);
     }
 };
 
@@ -125,6 +172,18 @@ public:
     uint64_t get_row_count(
         const std::string& start_date = "",
         const std::string& end_date = ""
+    );
+
+    /**
+     * Insert computed embeddings into wspr.model_features
+     *
+     * @param batch      Original training batch (for metadata)
+     * @param embeddings Computed embeddings from GPU
+     * @return Number of rows inserted, or 0 on error
+     */
+    size_t insert_batch(
+        const TrainingBatch& batch,
+        const EmbeddingResult& embeddings
     );
 
     /**

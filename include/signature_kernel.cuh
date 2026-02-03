@@ -61,6 +61,37 @@ __global__ void compute_path_quality_simple(
     float* __restrict__ out_quality
 );
 
+/**
+ * Compute propagation signature embeddings (float4 vector output)
+ *
+ * Output embedding components:
+ *   x: Normalized distance (0-1)
+ *   y: Solar penalty factor (X-ray impact)
+ *   z: Geomagnetic penalty factor (Kp impact)
+ *   w: Final combined quality score
+ *
+ * @param n              Number of paths
+ * @param tx_lat         Transmitter latitudes (degrees)
+ * @param tx_lon         Transmitter longitudes (degrees)
+ * @param rx_lat         Receiver latitudes (degrees)
+ * @param rx_lon         Receiver longitudes (degrees)
+ * @param solar_kp       Kp index at spot timestamp
+ * @param solar_xray     X-ray flux at spot timestamp (W/m²)
+ * @param out_embedding  Output float4 embeddings
+ * @param out_distance   Output distances in km (optional, can be NULL)
+ */
+__global__ void compute_signature_embedding(
+    int n,
+    const float* __restrict__ tx_lat,
+    const float* __restrict__ tx_lon,
+    const float* __restrict__ rx_lat,
+    const float* __restrict__ rx_lon,
+    const float* __restrict__ solar_kp,
+    const float* __restrict__ solar_xray,
+    float4* __restrict__ out_embedding,
+    float* __restrict__ out_distance
+);
+
 #ifdef __cplusplus
 }
 #endif

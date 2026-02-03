@@ -214,6 +214,75 @@ __global__ void compute_path_quality(
 }
 
 /**
+ * Compute propagation signature embeddings for WSPR paths
+ *
+ * Outputs a float4 vector per path for ML/k-NN search:
+ *   x: Normalized distance (0-1, where 1 = 20000km max)
+ *   y: Solar penalty factor (X-ray/D-layer absorption impact)
+ *   z: Geomagnetic penalty factor (Kp storm impact)
+ *   w: Final combined path quality score
+ *
+ * This decomposition allows searching for specific phenomena:
+ *   - High solar impact events (low y, normal z)
+ *   - Geomagnetic storm effects (normal y, low z)
+ *   - Combined degradation (low y and z)
+ *
+ * @param n            Number of paths to process
+ * @param tx_lat       Transmitter latitudes (degrees)
+ * @param tx_lon       Transmitter longitudes (degrees)
+ * @param rx_lat       Receiver latitudes (degrees)
+ * @param rx_lon       Receiver longitudes (degrees)
+ * @param solar_kp     Kp index at spot timestamp
+ * @param solar_xray   X-ray flux at spot timestamp (W/m², 0.1-0.8nm)
+ * @param out_embedding Output float4 embeddings
+ * @param out_distance Output distances in km (optional, can be NULL)
+ */
+__global__ void compute_signature_embedding(
+    int n,
+    const float* __restrict__ tx_lat,
+    const float* __restrict__ tx_lon,
+    const float* __restrict__ rx_lat,
+    const float* __restrict__ rx_lon,
+    const float* __restrict__ solar_kp,
+    const float* __restrict__ solar_xray,
+    float4* __restrict__ out_embedding,
+    float* __restrict__ out_distance
+) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (idx >= n) return;
+
+    // Calculate great circle distance
+    float dist = haversine_distance(
+        tx_lat[idx], tx_lon[idx],
+        rx_lat[idx], rx_lon[idx]
+    );
+
+    // Calculate individual penalty factors
+    float q_dist = distance_quality(dist);
+    float q_xray = xray_penalty(solar_xray[idx]);
+    float q_geo = geomagnetic_penalty(solar_kp[idx]);
+
+    // Combined quality score
+    float quality = q_dist * q_xray * q_geo;
+
+    // Normalize distance to 0-1 (max ~20000km for antipodal)
+    float norm_dist = fminf(dist / 20000.0f, 1.0f);
+
+    // Output embedding vector
+    out_embedding[idx] = make_float4(
+        norm_dist,    // x: Normalized distance
+        q_xray,       // y: Solar/X-ray penalty (1.0 = no impact, 0.0 = blackout)
+        q_geo,        // z: Geomagnetic penalty (1.0 = quiet, 0.0 = severe storm)
+        quality       // w: Final combined quality
+    );
+
+    if (out_distance != nullptr) {
+        out_distance[idx] = dist;
+    }
+}
+
+/**
  * Simplified kernel for basic path quality (Kp only)
  *
  * Matches Gemini's original prototype signature.

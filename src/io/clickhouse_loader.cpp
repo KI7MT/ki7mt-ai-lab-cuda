@@ -158,7 +158,9 @@ TrainingBatch ClickHouseLoader::fetch_batch(
             << "    toUnixTimestamp(w.timestamp) AS ts, "
             << "    coalesce(s.kp_index, 0) AS kp, "
             << "    coalesce(s.xray_long, 0) AS xray, "
-            << "    coalesce(s.observed_flux, 0) AS sfi "
+            << "    coalesce(s.observed_flux, 0) AS sfi, "
+            << "    w.frequency AS freq, "
+            << "    w.band AS band "
             << "FROM wspr.spots_raw w "
             << "LEFT JOIN solar.indices_raw s ON "
             << "    toDate(w.timestamp) = s.date AND "
@@ -193,6 +195,8 @@ TrainingBatch ClickHouseLoader::fetch_batch(
                 auto kp_col = block[3]->As<clickhouse::ColumnFloat32>();
                 auto xray_col = block[4]->As<clickhouse::ColumnFloat32>();
                 auto sfi_col = block[5]->As<clickhouse::ColumnFloat32>();
+                auto freq_col = block[6]->As<clickhouse::ColumnUInt64>();
+                auto band_col = block[7]->As<clickhouse::ColumnInt32>();
 
                 std::string tx_grid(tx_grid_col->At(row));
                 std::string rx_grid(rx_grid_col->At(row));
@@ -213,6 +217,10 @@ TrainingBatch ClickHouseLoader::fetch_batch(
                 batch.xray_flux.push_back(xray_col->At(row));
                 batch.sfi.push_back(sfi_col->At(row));
                 batch.timestamps.push_back(ts_col->At(row));
+                batch.tx_grids.push_back(tx_grid);
+                batch.rx_grids.push_back(rx_grid);
+                batch.frequencies.push_back(freq_col->At(row));
+                batch.bands.push_back(band_col->At(row));
             }
         });
 
@@ -260,6 +268,115 @@ uint64_t ClickHouseLoader::get_row_count(
     }
 
     return count;
+}
+
+size_t ClickHouseLoader::insert_batch(
+    const TrainingBatch& batch,
+    const EmbeddingResult& embeddings
+) {
+    if (!connected_) {
+        last_error_ = "Not connected to ClickHouse";
+        return 0;
+    }
+
+    if (batch.size() != embeddings.size()) {
+        last_error_ = "Batch and embeddings size mismatch";
+        return 0;
+    }
+
+    size_t n = batch.size();
+    if (n == 0) {
+        return 0;
+    }
+
+    try {
+        // Build columnar block for insertion
+        clickhouse::Block block;
+
+        // Timestamp column
+        auto col_timestamp = std::make_shared<clickhouse::ColumnDateTime>();
+        for (size_t i = 0; i < n; i++) {
+            col_timestamp->Append(batch.timestamps[i]);
+        }
+        block.AppendColumn("timestamp", col_timestamp);
+
+        // TX grid column
+        auto col_tx_grid = std::make_shared<clickhouse::ColumnFixedString>(8);
+        for (size_t i = 0; i < n; i++) {
+            std::string grid = batch.tx_grids[i];
+            grid.resize(8, ' ');  // Pad to 8 chars
+            col_tx_grid->Append(grid);
+        }
+        block.AppendColumn("tx_grid", col_tx_grid);
+
+        // RX grid column
+        auto col_rx_grid = std::make_shared<clickhouse::ColumnFixedString>(8);
+        for (size_t i = 0; i < n; i++) {
+            std::string grid = batch.rx_grids[i];
+            grid.resize(8, ' ');  // Pad to 8 chars
+            col_rx_grid->Append(grid);
+        }
+        block.AppendColumn("rx_grid", col_rx_grid);
+
+        // Frequency column
+        auto col_frequency = std::make_shared<clickhouse::ColumnUInt64>();
+        for (size_t i = 0; i < n; i++) {
+            col_frequency->Append(batch.frequencies[i]);
+        }
+        block.AppendColumn("frequency", col_frequency);
+
+        // Band column
+        auto col_band = std::make_shared<clickhouse::ColumnInt32>();
+        for (size_t i = 0; i < n; i++) {
+            col_band->Append(batch.bands[i]);
+        }
+        block.AppendColumn("band", col_band);
+
+        // Distance column
+        auto col_distance = std::make_shared<clickhouse::ColumnUInt32>();
+        for (size_t i = 0; i < n; i++) {
+            col_distance->Append(static_cast<uint32_t>(embeddings.distance_km[i]));
+        }
+        block.AppendColumn("distance", col_distance);
+
+        // Kp index column
+        auto col_kp = std::make_shared<clickhouse::ColumnFloat32>();
+        for (size_t i = 0; i < n; i++) {
+            col_kp->Append(batch.kp_index[i]);
+        }
+        block.AppendColumn("kp_index", col_kp);
+
+        // X-ray flux column
+        auto col_xray = std::make_shared<clickhouse::ColumnFloat32>();
+        for (size_t i = 0; i < n; i++) {
+            col_xray->Append(batch.xray_flux[i]);
+        }
+        block.AppendColumn("xray_flux", col_xray);
+
+        // Embedding array column
+        auto col_embedding = std::make_shared<clickhouse::ColumnArray>(
+            std::make_shared<clickhouse::ColumnFloat32>()
+        );
+        for (size_t i = 0; i < n; i++) {
+            auto arr = std::make_shared<clickhouse::ColumnFloat32>();
+            arr->Append(embeddings.norm_distance[i]);
+            arr->Append(embeddings.solar_penalty[i]);
+            arr->Append(embeddings.geo_penalty[i]);
+            arr->Append(embeddings.quality[i]);
+            col_embedding->AppendAsColumn(arr);
+        }
+        block.AppendColumn("embedding", col_embedding);
+
+        // Insert the block
+        impl_->client->Insert("wspr.model_features", block);
+
+        last_error_.clear();
+        return n;
+
+    } catch (const std::exception& e) {
+        last_error_ = std::string("Insert failed: ") + e.what();
+        return 0;
+    }
 }
 
 } // namespace io
