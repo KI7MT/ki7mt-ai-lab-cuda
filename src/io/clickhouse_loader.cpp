@@ -150,21 +150,33 @@ TrainingBatch ClickHouseLoader::fetch_batch(
 
     try {
         // Build query with LEFT JOIN to solar indices
-        // Match on hour (solar data is typically hourly/3-hourly)
+        // Pre-aggregate solar data into 3-hour buckets (matches Kp publication schedule)
+        // Then join WSPR spots to the matching 3-hour window
         std::ostringstream sql;
-        sql << "SELECT "
+        sql << "WITH solar_3h AS ("
+            << "    SELECT "
+            << "        date, "
+            << "        intDiv(toHour(time), 3) AS hour_bucket, "
+            << "        max(kp_index) AS kp, "
+            << "        max(ap_index) AS ap, "
+            << "        max(xray_long) AS xray, "
+            << "        max(observed_flux) AS sfi "
+            << "    FROM solar.indices_raw "
+            << "    GROUP BY date, hour_bucket "
+            << ") "
+            << "SELECT "
             << "    w.grid AS tx_grid, "
             << "    w.reporter_grid AS rx_grid, "
             << "    toUnixTimestamp(w.timestamp) AS ts, "
-            << "    coalesce(s.kp_index, 0) AS kp, "
-            << "    coalesce(s.xray_long, 0) AS xray, "
-            << "    coalesce(s.observed_flux, 0) AS sfi, "
+            << "    coalesce(s.kp, 0) AS kp, "
+            << "    coalesce(s.xray, 0) AS xray, "
+            << "    coalesce(s.sfi, 0) AS sfi, "
             << "    w.frequency AS freq, "
             << "    w.band AS band "
             << "FROM wspr.spots_raw w "
-            << "LEFT JOIN solar.indices_raw s ON "
+            << "LEFT JOIN solar_3h s ON "
             << "    toDate(w.timestamp) = s.date AND "
-            << "    toHour(w.timestamp) = toHour(s.time) "
+            << "    intDiv(toHour(w.timestamp), 3) = s.hour_bucket "
             << "WHERE 1=1 ";
 
         if (!start_date.empty()) {

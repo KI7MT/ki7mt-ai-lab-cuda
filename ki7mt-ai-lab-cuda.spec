@@ -2,7 +2,7 @@
 %global debug_package %{nil}
 
 Name:           ki7mt-ai-lab-cuda
-Version:        2.0.7
+Version:        2.0.8
 Release:        1%{?dist}
 Summary:        Sovereign CUDA HAL for KI7MT AI Lab WSPR processing
 
@@ -101,6 +101,13 @@ make install DESTDIR=%{buildroot} CUDA_PATH=$CUDA_PATH
 %attr(755,root,root) %{_datadir}/%{name}/src/*.sh
 
 %changelog
+* Mon Feb 03 2026 Greg Beam <ki7mt@yahoo.com> - 2.0.8-1
+- Fix Physics Gap: 3-hour bucket JOIN for solar data matching
+- ClickHouse loader CTE aggregates Kp/X-ray/SFI into 3-hour windows
+- Solar penalty now varies 0.1-1.0 (was stuck at 1.0)
+- Geo penalty now varies 0.26-1.0 (was stuck at 1.0)
+- Add wspr.training_set_v1 Gold Standard dataset (6M rows, Jan 27-Feb 1)
+
 * Sun Feb 02 2026 Greg Beam <ki7mt@yahoo.com> - 2.0.7-1
 - Phase 7: Vector Vault - float4 embeddings with write-back to ClickHouse
 - Phase 8: Bulk Processor for overnight dataset processing

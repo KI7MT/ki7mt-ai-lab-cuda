@@ -48,7 +48,7 @@ void print_header() {
     printf("\n");
     printf("┌─────────────────────────────────────────────────────────────┐\n");
     printf("│  Signature Engine Training Demo - Blackwell sm_120          │\n");
-    printf("│  ki7mt-ai-lab-cuda v2.0.7                                   │\n");
+    printf("│  ki7mt-ai-lab-cuda v2.0.8                                   │\n");
     printf("│  Phase 7: Vector Vault (Embedding Write-Back)               │\n");
     printf("└─────────────────────────────────────────────────────────────┘\n");
     printf("\n");
