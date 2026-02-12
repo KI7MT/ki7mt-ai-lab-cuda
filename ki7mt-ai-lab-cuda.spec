@@ -2,7 +2,7 @@
 %global debug_package %{nil}
 
 Name:           ki7mt-ai-lab-cuda
-Version:        2.3.2
+Version:        2.4.0
 Release:        1%{?dist}
 Summary:        Sovereign CUDA HAL for KI7MT AI Lab WSPR processing
 
@@ -39,7 +39,7 @@ Features:
 - GPU-based deduplication kernel
 - Callsign sanitization kernel
 
-Optimized for 10+ billion row WSPR datasets with RTX 5090 (32GB VRAM).
+Optimized for 10+ billion row WSPR datasets with RTX PRO 6000 (96GB VRAM, 188 SMs).
 
 %package devel
 Summary:        Development files for %{name}
@@ -101,6 +101,10 @@ make install DESTDIR=%{buildroot} CUDA_PATH=$CUDA_PATH
 %attr(755,root,root) %{_datadir}/%{name}/src/*.sh
 
 %changelog
+* Tue Feb 11 2026 Greg Beam <ki7mt@yahoo.com> - 2.4.0-1
+- V20 production release
+- Update hardware refs: RTX 5090 (32GB) → RTX PRO 6000 (96GB, 188 SMs)
+
 * Sat Feb 08 2026 Greg Beam <ki7mt@yahoo.com> - 2.3.1-1
 - Medallion architecture: wspr.bronze->wspr.silver embedding pipeline
 - Replace stale core README copy with proper CUDA README
